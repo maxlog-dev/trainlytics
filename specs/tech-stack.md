@@ -164,12 +164,20 @@ Single-user app with username/password login. No OAuth, no magic links — just 
 
 | Concern | Choice |
 |---|---|
-| Token format | JWT (access token, short-lived) + refresh token (HTTP-only cookie) |
+| Token format | JWT access token (60 min) + JWT refresh token (HTTP-only cookie, 7 days sliding); each carries a `type` claim and is only accepted for its own purpose |
 | Password hashing | bcrypt |
 | Backend library | `python-jose` (JWT) + `passlib` (bcrypt) |
-| Frontend | Token stored in memory; refresh token in HTTP-only cookie |
+| Frontend | Access token stored in memory; refresh token in HTTP-only cookie |
 
-All API routes are protected by default. The frontend redirects to login on 401. Mobile browsers access the same API — no separate mobile auth flow needed.
+**Session policy**
+- The access token lives 60 minutes and is held in memory only.
+- The refresh token lives in an HTTP-only, `SameSite=Lax` cookie for 7 days and is reissued on every `/auth/refresh`, so the session ends 7 days after last access (sliding). Refresh also re-checks that the user still exists in `USERS`.
+- On a 401 the client calls `/auth/refresh` once (shared across concurrent requests) and retries the original request once; only if that fails does it redirect to login. The page-load refresh restores the session after a reload.
+- Set `COOKIE_SECURE=true` when serving over HTTPS so the refresh cookie gets the `Secure` flag.
+- Tokens are stateless: logout only clears the cookie, and a stolen refresh token cannot be revoked before it expires. Accepted trade-off for a self-hosted app.
+- The backend logs a warning on startup if `SECRET_KEY` is still the built-in default.
+
+All API routes are protected by default. The frontend redirects to login when the session cannot be refreshed. Mobile browsers access the same API — no separate mobile auth flow needed.
 
 ## Key Constraints
 

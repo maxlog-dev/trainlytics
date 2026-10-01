@@ -6,7 +6,9 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
-    refresh_token_expire_days: int = 30
+    refresh_token_expire_days: int = 7
+    # Set true when served over HTTPS so the refresh cookie gets the Secure flag
+    cookie_secure: bool = False
     # Comma-separated: "alice:$2b$...,bob:$2b$..."
     users: str = ""
 

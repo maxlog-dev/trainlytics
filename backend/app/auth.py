@@ -35,10 +35,19 @@ def create_token(data: dict, expires_delta: timedelta) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
 
-def decode_token(token: str) -> str | None:
-    """Returns username (sub claim) if token is valid, None otherwise."""
+def decode_token(token: str, expected_type: str = "access") -> str | None:
+    """Returns username (sub claim) if the token is valid and of the expected type, else None.
+
+    Access tokens issued before the "type" claim existed carry no type and are
+    still accepted as "access" for their remaining lifetime.
+    """
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        return payload.get("sub")
     except JWTError:
         return None
+    token_type = payload.get("type")
+    if expected_type == "access" and token_type is None:
+        token_type = "access"
+    if token_type != expected_type:
+        return None
+    return payload.get("sub")

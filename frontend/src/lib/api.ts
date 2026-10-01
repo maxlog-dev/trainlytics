@@ -20,16 +20,50 @@ export function setUnauthorizedHandler(handler: () => void): void {
   _onUnauthorized = handler
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+// Single-flight refresh: concurrent 401s share one POST /auth/refresh.
+let _refreshPromise: Promise<string | null> | null = null
+
+function refreshAccessToken(): Promise<string | null> {
+  if (!_refreshPromise) {
+    _refreshPromise = (async () => {
+      try {
+        const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+        if (!res.ok) return null
+        const data = (await res.json()) as { access_token?: string }
+        return data.access_token ?? null
+      } catch {
+        return null
+      } finally {
+        _refreshPromise = null
+      }
+    })()
+  }
+  return _refreshPromise
+}
+
+function send(method: string, path: string, body?: unknown): Promise<Response> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (_token) headers['Authorization'] = `Bearer ${_token}`
-
-  const res = await fetch(`/api${path}`, {
+  return fetch(`/api${path}`, {
     method,
     headers,
     credentials: 'include',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  let res = await send(method, path, body)
+
+  // Expired access token: refresh once and retry once. /auth/* 401s (wrong
+  // password, failed mount-time refresh) are passed through untouched.
+  if (res.status === 401 && !path.startsWith('/auth/')) {
+    const newToken = await refreshAccessToken()
+    if (newToken) {
+      setToken(newToken)
+      res = await send(method, path, body)
+    }
+  }
 
   if (res.status === 401) {
     _onUnauthorized?.()
