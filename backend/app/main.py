@@ -1,8 +1,10 @@
+import logging
 import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import settings
 from app.api import ai as ai_module
 from app.api import analytics as analytics_module
 from app.api import auth as auth_module
@@ -18,6 +20,18 @@ from app.api import apple_health as apple_health_module
 from app.api import imports as imports_module
 from app.api import strava as strava_module
 from app.api import templates as templates_module
+
+logger = logging.getLogger("trainlytics")
+
+_DEFAULT_SECRET_KEY = "change-me-in-production"
+if settings.secret_key == _DEFAULT_SECRET_KEY:
+    # Not fatal: SECRET_KEY also derives the Fernet key for stored API keys,
+    # so forcing a change would break existing deployments.
+    logger.warning(
+        "SECRET_KEY is the built-in default - anyone can forge login tokens. "
+        "Set SECRET_KEY to a long random value (note: changing it invalidates "
+        "stored encrypted API keys, which must then be re-entered)."
+    )
 
 app = FastAPI(title="Trainlytics API")
 

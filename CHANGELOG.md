@@ -4,6 +4,22 @@ All notable changes to Trainlytics are documented here.
 
 ---
 
+## 2026-10-01 — Sliding auth session
+
+### Changed
+
+- **Sliding 7-day session** — refresh token lifetime is now 7 days (was 30, fixed) and is reissued on every `/auth/refresh`, so the session ends 7 days after last access
+- **Silent refresh on 401** — the frontend refreshes the access token once (shared across concurrent requests) and retries the failed request instead of logging the user out after 60 minutes
+- **Token types enforced** — access tokens carry `type: access`; refresh tokens are rejected as bearer tokens and access tokens are rejected by `/auth/refresh`; tokens without a `type` are still accepted as access tokens; Strava OAuth state tokens are only accepted as state
+- `/auth/refresh` now returns 401 if the user was removed from `USERS`
+
+### Added
+
+- `COOKIE_SECURE` setting for the refresh cookie `Secure` flag (set `true` behind HTTPS)
+- Startup warning when `SECRET_KEY` is the built-in default
+
+---
+
 ## 2026-05-17 — Phase 14: Plan vs. Actual Deep Analytics
 
 ### Added
