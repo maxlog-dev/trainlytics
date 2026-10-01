@@ -4,6 +4,23 @@ All notable changes to Trainlytics are documented here.
 
 ---
 
+## 2026-10-01 — Exercise UX parity (log vs. edit)
+
+### Fixed
+
+- **Create exercises while logging** — the exercise picker now has a "+ New exercise" row at both levels (categories and exercises); it opens an inline name form, creates the exercise via `POST /exercises` (tagged with the current category when it is a real type), refreshes the exercise list and selects the new exercise
+- **Edit strength session used an outdated UI** — editing now uses the same exercise list as logging (grouped picker, collapsible blocks, "+ Add Exercise" below the last block, inline create); wellbeing and RPE are editable and included in the PATCH payload
+
+### Changed
+
+- **Shared `StrengthExerciseList`** component extracted from `LogWorkoutPage`; `ExerciseEntryBlock` gains `prefillFromLastSession` (disabled in edit so choosing or swapping an exercise no longer overwrites existing sets)
+
+### Tests
+
+- Picker create flow (type_ids, selection, inline error, Enter does not submit the form) and edit-form parity (grouped picker, Add Exercise placement, no `last-session-defaults` call, wellbeing/RPE in PATCH)
+
+---
+
 ## 2026-05-17 — Phase 14: Plan vs. Actual Deep Analytics
 
 ### Added
