@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useFieldArray, useWatch, useController } from 'react-hook-form'
 import { api } from '../lib/api'
 import { EraserIcon } from './EraserIcon'
+import { emptySet } from './exerciseEntryDefaults'
 
 export interface SetFormValues {
   reps: string
@@ -26,12 +27,6 @@ export interface ExerciseOption {
   notes?: string | null
   types?: ExerciseTypeTag[]
 }
-
-export const emptySet = (): SetFormValues => ({ reps: '', weight: '', notes: '', done: false })
-export const emptyEntry = (): ExerciseEntryFormValues => ({
-  exercise_id: '',
-  sets: [emptySet()],
-})
 
 /** Build a list of {label, exercises} groups for the exercise picker. */
 function groupExercises(exercises: ExerciseOption[]): { label: string; items: ExerciseOption[] }[] {
@@ -357,7 +352,7 @@ export function ExerciseEntryBlock({
       .then((data) => { if (!cancelled) setSwapReplacements(data) })
       .catch(() => { if (!cancelled) setSwapReplacements([]) })
     return () => { cancelled = true }
-  }, [selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedId])  
 
   async function swapExercise(replacement: ExerciseRef) {
     setSwapOpen(false)
