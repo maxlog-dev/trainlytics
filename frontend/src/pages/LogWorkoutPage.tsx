@@ -7,7 +7,6 @@ import { useFieldArray, useForm, useWatch, Controller } from 'react-hook-form'
 import { Layout } from '../components/Layout'
 import {
   emptyEntry,
-  ExerciseEntryBlock,
   type ExerciseEntryFormValues,
 } from '../components/ExerciseEntryBlock'
 import { TimeInput } from '../components/TimeInput'
@@ -15,6 +14,7 @@ import { api } from '../lib/api'
 import { datetimeLocalToUTC, localDateTimeNow, toLocalDateStr } from '../lib/dateUtils'
 import { saveDraft, loadDraft, clearDraft } from '../lib/draftUtils'
 import { kmToMetres } from '../lib/unitUtils'
+import { StrengthExerciseList } from '../components/StrengthExerciseList'
 import { EmojiRating, WELLBEING_OPTIONS, RPE_OPTIONS } from '../components/EmojiRating'
 import { AdaptSessionModal } from '../components/AdaptSessionModal'
 import { AdaptCardioModal } from '../components/plan/AdaptCardioModal'
@@ -819,7 +819,6 @@ function StrengthForm({ initialTemplateId, initialDate }: { initialTemplateId?: 
   const [templateSnapshot, setTemplateSnapshot] = useState<TemplateSnapshot | null>(null)
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false)
   const [diffState, setDiffState] = useState<DiffState | null>(null)
-  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set())
   const [titleTouched, setTitleTouched] = useState(false)
   const [showDraftBanner, setShowDraftBanner] = useState(false)
   const [pendingDraft, setPendingDraft] = useState<object | null>(null)
@@ -855,12 +854,6 @@ function StrengthForm({ initialTemplateId, initialDate }: { initialTemplateId?: 
   })
 
   const watchedFormValues = useWatch({ control })
-
-  const {
-    fields: exerciseFields,
-    append: appendExercise,
-    remove: removeExercise,
-  } = useFieldArray({ control, name: 'exercises' })
 
   useEffect(() => {
     if (initialTemplateId) applyTemplate(initialTemplateId)
@@ -1179,63 +1172,14 @@ function StrengthForm({ initialTemplateId, initialDate }: { initialTemplateId?: 
         </div>
 
         {/* Exercises */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-medium text-gray-900">Exercises</h2>
-          </div>
-          <div className="space-y-4">
-            {exerciseFields.map((exField, exIndex) => (
-              <ExerciseEntryBlock
-                key={exField.id}
-                exIndex={exIndex}
-                register={register}
-                control={control}
-                setValue={setValue}
-                exercises={exercises}
-                canRemove={exerciseFields.length > 1}
-                onRemove={() => {
-                  removeExercise(exIndex)
-                  setCollapsedExercises((prev) => {
-                    const next = new Set<number>()
-                    for (const idx of prev) {
-                      if (idx < exIndex) next.add(idx)
-                      else if (idx > exIndex) next.add(idx - 1)
-                    }
-                    return next
-                  })
-                }}
-                errors={errors}
-                showDone={templateSnapshot !== null}
-                isCollapsed={collapsedExercises.has(exIndex)}
-                onToggleCollapse={() =>
-                  setCollapsedExercises((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(exIndex)) next.delete(exIndex)
-                    else next.add(exIndex)
-                    return next
-                  })
-                }
-                onAutoCollapse={() =>
-                  setCollapsedExercises((prev) => new Set(prev).add(exIndex))
-                }
-                onAutoExpand={() =>
-                  setCollapsedExercises((prev) => {
-                    const next = new Set(prev)
-                    next.delete(exIndex)
-                    return next
-                  })
-                }
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => appendExercise(emptyEntry())}
-            className="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            + Add Exercise
-          </button>
-        </div>
+        <StrengthExerciseList
+          control={control}
+          register={register}
+          setValue={setValue}
+          errors={errors}
+          exercises={exercises}
+          showDone={templateSnapshot !== null}
+        />
 
         {createMutation.isError && (
           <p className="text-sm text-red-600">Failed to save session. Please try again.</p>
