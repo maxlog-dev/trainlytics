@@ -42,7 +42,7 @@ async def strava_callback(
     if error or not code or not state:
         return RedirectResponse(f"{frontend_url}/#/profile?strava=error")
 
-    username = decode_token(state)
+    username = decode_token(state, expected_type="strava_oauth")
     if not username:
         return RedirectResponse(f"{frontend_url}/#/profile?strava=error")
 

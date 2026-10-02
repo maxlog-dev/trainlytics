@@ -4,6 +4,36 @@ All notable changes to Trainlytics are documented here.
 
 ---
 
+## 2026-10-01 — Exercise UX parity (log vs. edit)
+
+### Fixed
+
+- **Create exercises while logging** — the exercise picker now has a "+ New exercise" row at both levels (categories and exercises); it opens an inline name form, creates the exercise via `POST /exercises` (tagged with the current category when it is a real type), refreshes the exercise list and selects the new exercise
+- **Edit strength session used an outdated UI** — editing now uses the same exercise list as logging (grouped picker, collapsible blocks, "+ Add Exercise" below the last block, inline create); wellbeing and RPE are editable and included in the PATCH payload
+
+### Changed
+
+- **Shared `StrengthExerciseList`** component extracted from `LogWorkoutPage`; `ExerciseEntryBlock` gains `prefillFromLastSession` (disabled in edit so choosing or swapping an exercise no longer overwrites existing sets)
+
+### Tests
+
+- Picker create flow (type_ids, selection, inline error, Enter does not submit the form) and edit-form parity (grouped picker, Add Exercise placement, no `last-session-defaults` call, wellbeing/RPE in PATCH)
+## 2026-10-01 — Sliding auth session
+
+### Changed
+
+- **Sliding 7-day session** — refresh token lifetime is now 7 days (was 30, fixed) and is reissued on every `/auth/refresh`, so the session ends 7 days after last access
+- **Silent refresh on 401** — the frontend refreshes the access token once (shared across concurrent requests) and retries the failed request instead of logging the user out after 60 minutes
+- **Token types enforced** — access tokens carry `type: access`; refresh tokens are rejected as bearer tokens and access tokens are rejected by `/auth/refresh`; tokens without a `type` are still accepted as access tokens; Strava OAuth state tokens are only accepted as state
+- `/auth/refresh` now returns 401 if the user was removed from `USERS`
+
+### Added
+
+- `COOKIE_SECURE` setting for the refresh cookie `Secure` flag (set `true` behind HTTPS)
+- Startup warning when `SECRET_KEY` is the built-in default
+
+---
+
 ## 2026-05-17 — Phase 14: Plan vs. Actual Deep Analytics
 
 ### Added

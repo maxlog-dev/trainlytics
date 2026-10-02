@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFieldArray, useWatch, useController } from 'react-hook-form'
+import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { EraserIcon } from './EraserIcon'
 import { emptySet } from './exerciseEntryDefaults'
@@ -76,9 +77,18 @@ function ExercisePickerDropdown({
 }) {
   const [open, setOpen] = useState(false)
   const [activeGroup, setActiveGroup] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [createPending, setCreatePending] = useState(false)
+  const [createdExercise, setCreatedExercise] = useState<ExerciseOption | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const qc = useQueryClient()
 
-  const selected = exercises.find((e) => String(e.id) === value)
+  // Keep a just-created exercise locally until the refetched list contains it
+  const selected =
+    exercises.find((e) => String(e.id) === value) ??
+    (createdExercise && String(createdExercise.id) === value ? createdExercise : undefined)
   const groups = groupExercises(exercises)
 
   // Close on outside click; reset level on close
@@ -87,6 +97,7 @@ function ExercisePickerDropdown({
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
         setActiveGroup(null)
+        setCreating(false)
       }
     }
     if (open) document.addEventListener('mousedown', handleClick)
@@ -95,6 +106,8 @@ function ExercisePickerDropdown({
 
   function openDropdown() {
     // When reopening, pre-select the group of the currently selected exercise
+    setCreating(false)
+    setCreateError(null)
     if (!open && value) {
       const group = groups.find((g) => g.items.some((ex) => String(ex.id) === value))
       setActiveGroup(group?.label ?? null)
@@ -109,6 +122,57 @@ function ExercisePickerDropdown({
     setOpen(false)
     setActiveGroup(null)
   }
+
+  function startCreate() {
+    setNewName('')
+    setCreateError(null)
+    setCreating(true)
+  }
+
+  function cancelCreate() {
+    setCreating(false)
+    setCreateError(null)
+  }
+
+  async function submitCreate() {
+    const name = newName.trim()
+    if (!name || createPending) return
+    // Only a real exercise type (not the "Other" bucket) is attached as a category
+    let typeIds: number[] = []
+    if (activeGroup && activeGroup !== 'Other') {
+      for (const ex of exercises) {
+        const t = ex.types?.find((tag) => tag.name === activeGroup)
+        if (t) {
+          typeIds = [t.id]
+          break
+        }
+      }
+    }
+    setCreatePending(true)
+    setCreateError(null)
+    try {
+      const created = await api.post<ExerciseOption>('/exercises', { name, type_ids: typeIds })
+      setCreatedExercise({ id: created.id, name: created.name ?? name, notes: created.notes ?? null })
+      await qc.invalidateQueries({ queryKey: ['exercises'] })
+      setCreating(false)
+      setNewName('')
+      select(String(created.id))
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Failed to create exercise')
+    } finally {
+      setCreatePending(false)
+    }
+  }
+
+  const newExerciseRow = (
+    <button
+      type="button"
+      onClick={startCreate}
+      className="w-full text-left px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50 font-medium border-t border-gray-100"
+    >
+      + New exercise
+    </button>
+  )
 
   const borderClass = hasError ? 'border-red-400' : 'border-gray-300'
   const currentGroupItems = activeGroup ? groups.find((g) => g.label === activeGroup)?.items ?? [] : []
@@ -137,8 +201,50 @@ function ExercisePickerDropdown({
       {open && (
         <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
 
+          {/* ── Create form ── */}
+          {creating && (
+            <div className="p-3 space-y-2">
+              <label className="block text-xs text-gray-500" htmlFor="new-exercise-name">
+                New exercise name
+              </label>
+              <input
+                id="new-exercise-name"
+                type="text"
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void submitCreate()
+                  }
+                }}
+                placeholder="Exercise name"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {createError && <p className="text-xs text-red-600">{createError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void submitCreate()}
+                  disabled={!newName.trim() || createPending}
+                  className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {createPending ? 'Creating…' : 'Create'}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelCreate}
+                  className="px-3 py-1.5 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── Level 1: category list ── */}
-          {activeGroup === null && (
+          {!creating && activeGroup === null && (
             <ul className="py-1">
               {groups.length === 0 && (
                 <li className="px-4 py-3 text-sm text-gray-400">No exercises yet.</li>
@@ -160,11 +266,12 @@ function ExercisePickerDropdown({
                   </button>
                 </li>
               ))}
+              <li>{newExerciseRow}</li>
             </ul>
           )}
 
           {/* ── Level 2: exercises in selected category ── */}
-          {activeGroup !== null && (
+          {!creating && activeGroup !== null && (
             <div>
               {/* Back header */}
               <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50">
@@ -195,6 +302,7 @@ function ExercisePickerDropdown({
                   </li>
                 ))}
               </ul>
+              {newExerciseRow}
             </div>
           )}
 
@@ -260,6 +368,7 @@ export function ExerciseEntryBlock({
   onRemove,
   errors,
   showDone = false,
+  prefillFromLastSession = true,
   isCollapsed = false,
   onToggleCollapse,
   onAutoCollapse,
@@ -274,6 +383,8 @@ export function ExerciseEntryBlock({
   onRemove: () => void
   errors: any
   showDone?: boolean
+  /** When false, selecting/swapping an exercise never fetches last-session defaults or touches sets. */
+  prefillFromLastSession?: boolean
   isCollapsed?: boolean
   onToggleCollapse?: () => void
   onAutoCollapse?: () => void
@@ -306,6 +417,8 @@ export function ExerciseEntryBlock({
   useEffect(() => {
     if (selectedId === prevSelectedIdRef.current) return
     prevSelectedIdRef.current = selectedId || ''
+
+    if (!prefillFromLastSession) return
 
     if (isSwappingRef.current) {
       isSwappingRef.current = false
@@ -356,9 +469,10 @@ export function ExerciseEntryBlock({
 
   async function swapExercise(replacement: ExerciseRef) {
     setSwapOpen(false)
-    isSwappingRef.current = true
+    isSwappingRef.current = prefillFromLastSession
     exerciseField.onChange(String(replacement.id))
     setFilledFromSession(false)
+    if (!prefillFromLastSession) return
     try {
       const data = await api.get<ExerciseDefaults>(`/exercises/${replacement.id}/last-session-defaults`)
       if (data.sets.length > 0) {

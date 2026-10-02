@@ -1,17 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useFieldArray, useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { Layout } from '../components/Layout'
 import { api } from '../lib/api'
 import { datetimeLocalToUTC, formatSessionDateTime, toDatetimeLocal } from '../lib/dateUtils'
 import { formatStrengthSession } from '../lib/exportUtils'
-import { EmojiRatingDisplay } from '../components/EmojiRating'
-
-interface Exercise {
-  id: number
-  name: string
-}
+import { EmojiRating, EmojiRatingDisplay } from '../components/EmojiRating'
+import { WELLBEING_OPTIONS, RPE_OPTIONS } from '../components/emojiRatingOptions'
+import { StrengthExerciseList } from '../components/StrengthExerciseList'
+import type { ExerciseEntryFormValues, ExerciseOption } from '../components/ExerciseEntryBlock'
 
 interface StrengthSet {
   id: number
@@ -45,28 +43,16 @@ interface StrengthSession {
 
 // ── Edit form types ──────────────────────────────────────────────────────────
 
-interface SetFormValues {
-  reps: string
-  weight: string
-  notes: string
-}
-
-interface ExerciseEntryFormValues {
-  exercise_id: string
-  sets: SetFormValues[]
-}
-
 interface EditFormValues {
   title: string
   duration_minutes: string
   calories: string
   date: string
   notes: string
+  wellbeing: number | null
+  rpe: number | null
   exercises: ExerciseEntryFormValues[]
 }
-
-const emptySet = (): SetFormValues => ({ reps: '', weight: '', notes: '' })
-const emptyEntry = (): ExerciseEntryFormValues => ({ exercise_id: '', sets: [emptySet()] })
 
 function toForm(session: StrengthSession): EditFormValues {
   return {
@@ -75,12 +61,15 @@ function toForm(session: StrengthSession): EditFormValues {
     calories: session.calories?.toString() ?? '',
     date: toDatetimeLocal(session.date),
     notes: session.notes ?? '',
+    wellbeing: session.wellbeing ?? null,
+    rpe: session.rpe ?? null,
     exercises: session.exercises.map((entry) => ({
       exercise_id: entry.exercise_id.toString(),
       sets: entry.sets.map((s) => ({
         reps: s.reps?.toString() ?? '',
         weight: s.weight?.toString() ?? '',
         notes: s.notes ?? '',
+        done: false,
       })),
     })),
   }
@@ -96,17 +85,13 @@ function EditForm({
   isPending,
 }: {
   session: StrengthSession
-  exercises: Exercise[]
+  exercises: ExerciseOption[]
   onSave: (data: EditFormValues) => void
   onCancel: () => void
   isPending: boolean
 }) {
-  const { register, handleSubmit, control, formState: { errors } } = useForm<EditFormValues>({
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<EditFormValues>({
     defaultValues: toForm(session),
-  })
-  const { fields: exFields, append: appendEx, remove: removeEx } = useFieldArray({
-    control,
-    name: 'exercises',
   })
 
   return (
@@ -130,6 +115,30 @@ function EditForm({
           />
           {errors.date && <p className="mt-1 text-xs text-red-600">{errors.date.message}</p>}
         </div>
+        <Controller
+          control={control}
+          name="wellbeing"
+          render={({ field }) => (
+            <EmojiRating
+              label="How are you feeling?"
+              options={WELLBEING_OPTIONS}
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
+        <Controller
+          control={control}
+          name="rpe"
+          render={({ field }) => (
+            <EmojiRating
+              label="How hard was that?"
+              options={RPE_OPTIONS}
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
           <textarea
@@ -161,31 +170,15 @@ function EditForm({
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-medium text-gray-900">Exercises</h2>
-          <button
-            type="button"
-            onClick={() => appendEx(emptyEntry())}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            + Add Exercise
-          </button>
-        </div>
-        <div className="space-y-4">
-          {exFields.map((exField, exIndex) => (
-            <EditExerciseBlock
-              key={exField.id}
-              exIndex={exIndex}
-              register={register}
-              control={control}
-              exercises={exercises}
-              canRemove={exFields.length > 1}
-              onRemove={() => removeEx(exIndex)}
-            />
-          ))}
-        </div>
-      </div>
+      <StrengthExerciseList
+        control={control}
+        register={register}
+        setValue={setValue}
+        errors={errors}
+        exercises={exercises}
+        showDone={false}
+        prefillFromLastSession={false}
+      />
 
       <div className="flex gap-3">
         <button
@@ -207,86 +200,6 @@ function EditForm({
   )
 }
 
-function EditExerciseBlock({
-  exIndex,
-  register,
-  control,
-  exercises,
-  canRemove,
-  onRemove,
-}: {
-  exIndex: number
-  register: any
-  control: any
-  exercises: Exercise[]
-  canRemove: boolean
-  onRemove: () => void
-}) {
-  const { fields: setFields, append: appendSet, remove: removeSet } = useFieldArray({
-    control,
-    name: `exercises.${exIndex}.sets`,
-  })
-  const selectedId = useWatch({ control, name: `exercises.${exIndex}.exercise_id` })
-  const selectedExercise = exercises.find((e) => e.id === parseInt(selectedId, 10))
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-gray-700">
-          Exercise {exIndex + 1}{selectedExercise ? ` — ${selectedExercise.name}` : ''}
-        </span>
-        {canRemove && (
-          <button type="button" onClick={onRemove} className="text-xs text-red-500 hover:text-red-700">
-            Remove exercise
-          </button>
-        )}
-      </div>
-      <div className="mb-4">
-        <select
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          {...register(`exercises.${exIndex}.exercise_id`, { required: 'Select an exercise' })}
-        >
-          <option value="">— select exercise —</option>
-          {exercises.map((e) => (
-            <option key={e.id} value={e.id}>{e.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_1.5rem] gap-1.5 mb-1 px-1">
-        <span className="text-xs text-gray-400">#</span>
-        <span className="text-xs text-gray-500">Reps</span>
-        <span className="text-xs text-gray-500">Weight (kg)</span>
-        <span className="text-xs text-gray-500">Notes</span>
-        <span />
-      </div>
-      <div className="space-y-2">
-        {setFields.map((setField, setIndex) => (
-          <div key={setField.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_1.5rem] gap-1.5 items-center">
-            <span className="text-xs text-gray-400 text-center">{setIndex + 1}</span>
-            <input type="number" min="0" placeholder="reps"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-              {...register(`exercises.${exIndex}.sets.${setIndex}.reps`)} />
-            <input type="number" min="0" step="any" placeholder="kg"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-              {...register(`exercises.${exIndex}.sets.${setIndex}.weight`)} />
-            <input type="text" placeholder="notes"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-              {...register(`exercises.${exIndex}.sets.${setIndex}.notes`)} />
-            {setFields.length > 1 ? (
-              <button type="button" onClick={() => removeSet(setIndex)}
-                className="text-gray-400 hover:text-red-500 text-sm" aria-label="Remove set">✕</button>
-            ) : <span />}
-          </div>
-        ))}
-      </div>
-      <button type="button" onClick={() => appendSet(emptySet())}
-        className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium">
-        + Add Set
-      </button>
-    </div>
-  )
-}
-
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function StrengthSessionDetailPage() {
@@ -303,7 +216,7 @@ export default function StrengthSessionDetailPage() {
 
   const { data: exercises = [] } = useQuery({
     queryKey: ['exercises'],
-    queryFn: () => api.get<Exercise[]>('/exercises'),
+    queryFn: () => api.get<ExerciseOption[]>('/exercises'),
     enabled: editing,
   })
 
@@ -315,6 +228,8 @@ export default function StrengthSessionDetailPage() {
         calories: data.calories ? parseInt(data.calories, 10) : null,
         date: datetimeLocalToUTC(data.date),
         notes: data.notes || null,
+        wellbeing: data.wellbeing,
+        rpe: data.rpe,
         exercises: data.exercises.map((entry, i) => ({
           exercise_id: parseInt(entry.exercise_id, 10),
           order: i + 1,
