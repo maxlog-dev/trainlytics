@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     # Comma-separated: "alice:$2b$...,bob:$2b$..."
     users: str = ""
+    # Local-dev only: enables the built-in demo/demo login (see app/demo).
+    # docker-compose.prod.yml forces this to "false".
+    demo_user_enabled: bool = False
 
     # Frontend base URL — used for OAuth redirects after callback
     frontend_url: str = "http://localhost:5173"

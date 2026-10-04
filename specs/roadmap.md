@@ -401,6 +401,20 @@ A user can tap "Review week" after a hard week, see AI-proposed adjustments to n
 
 ---
 
+## Developer Tooling
+
+Cross-cutting work that supports development rather than end users.
+
+### Dev demo user *(2026-10-04)* — see `specs/2026-10-04-dev-demo-user/`
+
+- [x] `DEMO_USER_ENABLED` flag: local stack accepts `demo` / `demo`; forced off in `docker-compose.prod.yml`
+- [x] `scripts/seed-demo.sh` resets and reseeds 12 weeks of deterministic data (sessions, templates, steps, plans) anchored to the current week
+- [x] Frontend Dockerfile pins pnpm so a fresh `docker compose up --build` works (miptgirl/trainlytics#20)
+
+**Why:** every developer reviews UI changes against the same realistic dataset instead of an empty or personal account.
+
+---
+
 ## Out of Scope (for now)
 
 - Multi-user support (single account only)
