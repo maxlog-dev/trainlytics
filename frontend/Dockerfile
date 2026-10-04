@@ -1,8 +1,10 @@
 FROM node:20-slim AS builder
-RUN npm install -g pnpm
+# pnpm version comes from "packageManager" in package.json (via corepack)
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm --version && pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
