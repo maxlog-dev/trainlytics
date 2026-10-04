@@ -22,6 +22,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://trainlytics:trainlytics@db:5432/trainlytics
       UV_LINK_MODE: copy
       DEBUG_SQL_ENABLED: "true"
+      # Local dev only: enables the demo/demo login (seed it with scripts/seed-demo.sh)
+      DEMO_USER_ENABLED: "true"
     depends_on:
       db:
         condition: service_healthy

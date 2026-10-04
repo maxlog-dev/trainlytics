@@ -3,7 +3,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Cookie, HTTPException, Response
 from pydantic import BaseModel
 
-from app.auth import authenticate_user, create_token, decode_token, parse_users
+from app.auth import authenticate_user, create_token, decode_token, is_known_user
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -57,7 +57,7 @@ async def refresh(
     if not refresh_token:
         raise HTTPException(status_code=401, detail="No refresh token")
     username = decode_token(refresh_token, expected_type="refresh")
-    if not username or username not in parse_users(settings.users):
+    if not username or not is_known_user(username):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     access_token = create_token(
         {"sub": username, "type": "access"},

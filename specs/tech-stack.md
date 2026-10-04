@@ -102,6 +102,16 @@ docker compose exec backend uv run alembic upgrade head
 
 **4. Open the app** at [http://localhost:5173](http://localhost:5173) and log in with the credentials from your `.env`.
 
+**5. (Optional) Seed the demo user** — a shared account with 12 weeks of realistic data, for reviewing UI changes against the same dataset as every other developer:
+
+```bash
+bash scripts/seed-demo.sh
+```
+
+Then log in as **`demo` / `demo`**. The script runs migrations, deletes all of `demo`'s data and reseeds it. Values are deterministic and dates are anchored to the current week, so rerun it whenever you want a clean, up-to-date baseline. With Podman, use `COMPOSE="podman compose" bash scripts/seed-demo.sh`.
+
+The demo login only works when `DEMO_USER_ENABLED=true`. `docker-compose.yml` sets it for local dev; `docker-compose.prod.yml` forces it to `false`, and the seeder refuses to run without it. Details: `specs/2026-10-04-dev-demo-user/`.
+
 ---
 
 ### Deploying to production
@@ -182,5 +192,6 @@ All API routes are protected by default. The frontend redirects to login when th
 ## Key Constraints
 
 - Accounts are defined via environment variables — no registration UI; multiple accounts supported but managed at the infrastructure level, not through the app
+- The only exception is the dev demo account (`demo` / `demo`), enabled by `DEMO_USER_ENABLED=true` in local dev and always disabled in production
 - No external dependencies for core functionality (no third-party fitness APIs)
 - All data stays local or on a user-controlled server

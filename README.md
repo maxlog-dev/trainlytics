@@ -61,6 +61,19 @@ As a user, I want to export a weekly training summary in text format, so I can e
 
 ---
 
+## Local Development
+
+See [tech-stack.md](./specs/tech-stack.md#running-locally) for setup. To get a populated account for testing UI changes:
+
+```bash
+docker compose up --build -d
+bash scripts/seed-demo.sh   # then log in at http://localhost:5173 as demo / demo
+```
+
+The demo user exists only in local dev; it is disabled in production.
+
+---
+
 ## Deployment
 
 **Prerequisites:** A Linux server with Docker, Docker Compose, and Git installed. A `.env` file in the repo root with `SECRET_KEY` and `USERS` set (see [tech-stack.md](./specs/tech-stack.md) for details).
