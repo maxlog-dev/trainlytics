@@ -100,9 +100,53 @@ describe('Layout mobile shell', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('lists Today first in the desktop nav', () => {
+  it('lists Today, Plan, and Stats, then Log Workout, in the sidebar', () => {
     renderAt('/plan')
-    const nav = screen.getAllByRole('navigation').find((n) => n.className.includes('hidden md:flex'))!
-    expect(within(nav).getAllByRole('link')[0]).toHaveTextContent('Today')
+    const nav = screen.getByRole('navigation', { name: 'Sidebar' })
+    const links = within(nav).getAllByRole('link')
+    expect(links.map((l) => l.textContent)).toEqual(['Today', 'Plan', 'Stats', 'Log Workout'])
+    expect(links.find((l) => l.textContent === 'Plan')).toHaveAttribute('aria-current', 'page')
+    expect(links.find((l) => l.textContent === 'Log Workout')).not.toHaveClass('ring-2')
+  })
+
+  it('keeps the phone shell below lg and the rail from lg', () => {
+    renderAt('/plan')
+    const rail = screen.getByRole('complementary')
+    expect(rail).toHaveClass('hidden', 'lg:flex', 'h-dvh')
+    expect(rail.className).toContain('env(safe-area-inset-top)')
+    expect(rail.className).toContain('env(safe-area-inset-left)')
+    expect(rail.className).toContain('env(safe-area-inset-bottom)')
+    expect(screen.getByRole('banner')).toHaveClass('lg:hidden')
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toHaveClass('lg:hidden')
+  })
+
+  it('marks Stats current on a session, and Log Workout current on the log form', () => {
+    const { unmount } = renderAt('/sessions/12')
+    const sidebar = screen.getByRole('navigation', { name: 'Sidebar' })
+    expect(within(sidebar).getByRole('link', { name: 'Stats' })).toHaveAttribute('aria-current', 'page')
+    unmount()
+
+    renderAt('/log')
+    const logging = screen.getByRole('navigation', { name: 'Sidebar' })
+    const logLink = within(logging).getByRole('link', { name: 'Log Workout' })
+    expect(logLink).toHaveAttribute('aria-current', 'page')
+    expect(logLink).toHaveClass('ring-2')
+    expect(within(logging).getByRole('link', { name: 'Today' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('keeps Templates, Steps, Profile, and Settings with the account and signs out', async () => {
+    renderAt('/templates')
+    const account = screen.getByRole('navigation', { name: 'Account' })
+    expect(within(account).getAllByRole('link').map((l) => l.getAttribute('href'))).toEqual([
+      '/templates',
+      '/steps',
+      '/profile',
+      '/settings',
+    ])
+    expect(within(account).getByRole('link', { name: 'Templates' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByText('demo')).toBeInTheDocument()
+    logout.mockClear()
+    await userEvent.click(within(account).getByRole('button', { name: 'Sign out' }))
+    expect(logout).toHaveBeenCalledTimes(1)
   })
 })
