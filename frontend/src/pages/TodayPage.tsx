@@ -228,7 +228,9 @@ export default function TodayPage() {
   // Tomorrow belongs to the next plan on Sundays; the reschedule API only moves within a week
   const canMoveToTomorrow = getMondayOf(new Date(tomorrow + 'T00:00:00')) === weekStart
 
-  const { data, isLoading, isError } = useWeekPlan(weekStart)
+  const { data, isLoading, isError: planFailed } = useWeekPlan(weekStart)
+  // A failed refetch keeps the last plan (e.g. restored from the last visit) on screen
+  const isError = planFailed && !data
   const { data: cardioTypes = [] } = useQuery({
     queryKey: ['cardio-types'],
     queryFn: () => api.get<{ id: number; name: string }[]>('/cardio-types'),

@@ -8,14 +8,19 @@ vi.mock('../lib/api', async (importOriginal) => ({
   api: { get: vi.fn(), patch: vi.fn().mockResolvedValue({}) },
 }))
 
+const auth = vi.hoisted(() => ({ token: 'test-token' as string | null }))
+
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ token: 'test-token' }),
+  useAuth: () => auth,
 }))
 
 import { AppleHealthSection } from '../components/AppleHealthSection'
+import { setToken } from '../lib/api'
 
 // Minimal XHR stand-in: send() immediately "completes" with the queued response.
 let nextResponse: { status: number; body: string }
+let sentHeaders: Record<string, string> = {}
+let sends = 0
 
 class FakeXHR {
   status = 0
@@ -24,8 +29,11 @@ class FakeXHR {
   onload: (() => void) | null = null
   onerror: (() => void) | null = null
   open() {}
-  setRequestHeader() {}
+  setRequestHeader(name: string, value: string) {
+    sentHeaders[name] = value
+  }
   send() {
+    sends++
     this.status = nextResponse.status
     this.responseText = nextResponse.body
     this.onload?.()
@@ -58,6 +66,10 @@ function uploadZip(input: HTMLInputElement) {
 describe('AppleHealthSection — upload error detail', () => {
   beforeEach(() => {
     vi.stubGlobal('XMLHttpRequest', FakeXHR)
+    auth.token = 'test-token'
+    sentHeaders = {}
+    sends = 0
+    setToken(null) // the api module's own token, set by a refresh in an earlier test
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -93,5 +105,26 @@ describe('AppleHealthSection — upload error detail', () => {
     nextResponse = { status: 502, body }
     uploadZip(renderSection())
     expect(screen.getByText('Upload failed.')).toBeInTheDocument()
+  })
+
+  it('waits for the session to be renewed when there is no token yet (just after launch)', async () => {
+    auth.token = null
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ access_token: 'fresh-token' }), { status: 200 })))
+    nextResponse = { status: 400, body: JSON.stringify({ detail: 'Not a valid Apple Health export.' }) }
+
+    uploadZip(renderSection())
+
+    expect(await screen.findByText('Not a valid Apple Health export.')).toBeInTheDocument()
+    expect(sentHeaders['Authorization']).toBe('Bearer fresh-token')
+  })
+
+  it("doesn't send the archive when the session can't be renewed", async () => {
+    auth.token = null
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })))
+
+    uploadZip(renderSection())
+
+    expect(await screen.findByText(/Could not renew the session/)).toBeInTheDocument()
+    expect(sends).toBe(0)
   })
 })

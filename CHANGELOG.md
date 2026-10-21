@@ -4,6 +4,31 @@ All notable changes to Trainlytics are documented here.
 
 ---
 
+## 2026-10-21 — Faster PWA launch
+
+### Added
+
+- **Branded launch**: the logo on the app background shows from the first paint until the first page is ready, with matching iOS launch images for the Home Screen app, instead of a blank page while the app loads and the session is checked
+- **Offline app shell with an update banner**: a service worker caches the app (HTML, JS, CSS, self-hosted fonts), so launches don't wait on the network for it; `/api` is never cached. A new version downloads in the background and shows "A new version is available — Reload"; nothing reloads on its own, so a workout in progress is never interrupted
+- **Last-known data at once**: the query cache is kept in IndexedDB per account (7 days, discarded by each new build). A signed-in launch renders the previous visit's data immediately and refreshes it in the background, while the session is renewed. Offline the app stays on that data instead of going to the sign-in page
+
+### Changed
+
+- **Smaller initial bundle**: pages other than Today, Log and Workout, the Adapt modals and the Markdown renderer load on demand; a chunk that fails to load (e.g. after a deploy) offers a reload. A session's detail page loads alongside its data instead of after it
+- One `/auth/refresh` per launch: requests made while it runs wait for its token instead of each getting a 401
+- A session refresh that can't reach the server no longer logs out; only a refused refresh (401) does. The request fails with "Could not renew the session…" and the next one tries again
+- Logout and session expiry also delete that account's persisted cache and the remembered session, so another account on the same browser never sees its data. Logging out in one tab signs out the app's other tabs
+- A request is never re-sent with another account's token: if a tab's session is replaced by another account (signed in from another tab), its pending requests fail instead of being replayed as that account
+- Today keeps its plan on screen when a background refresh of it fails
+- nginx: gzip on, hashed `/assets/` cached for a year (404 instead of the SPA fallback), `sw.js` and the manifest never cached
+
+### Deploy notes
+
+- The first launch after each deploy has no cached data (the build id busts the cache), then works as above
+- Clients already on this release pick up later deploys through the update banner; no hard refresh needed
+
+---
+
 ## 2026-10-13 — Weight steps per exercise
 
 ### Added

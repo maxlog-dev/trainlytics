@@ -1,9 +1,29 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Identifies this build: the persisted query cache of an older build is
+// discarded (src/lib/queryPersist.ts), since a deploy may change response
+// shapes. Always unique (build time), with the commit when git is there (the
+// Docker build context has no .git).
+function buildId(): string {
+  const time = Date.now().toString(36)
+  try {
+    const sha = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+    return sha ? `${sha}-${time}` : time
+  } catch {
+    return time
+  }
+}
+
 export default defineConfig({
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId()),
+  },
   plugins: [
     react(),
     tailwindcss(),

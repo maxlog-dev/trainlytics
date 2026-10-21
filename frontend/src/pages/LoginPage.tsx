@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { BootSplash } from '../components/BootSplash'
 import logo from '../assets/logo.svg'
 
 interface FormValues {
@@ -10,7 +11,7 @@ interface FormValues {
 }
 
 export default function LoginPage() {
-  const { token, isLoading, login } = useAuth()
+  const { token, username, isLoading, login } = useAuth()
   const navigate = useNavigate()
   const [apiError, setApiError] = useState<string | null>(null)
 
@@ -20,9 +21,10 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>()
 
-  if (isLoading) return null
+  if (isLoading) return <BootSplash />
 
-  if (token) return <Navigate to="/today" replace />
+  // Signed in, or a remembered session the server couldn't confirm (offline)
+  if (token || username) return <Navigate to="/today" replace />
 
   async function onSubmit(values: FormValues) {
     setApiError(null)

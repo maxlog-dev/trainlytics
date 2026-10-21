@@ -21,8 +21,10 @@ import TodayPage from './pages/TodayPage'
 import { api } from './lib/api'
 
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-const CardioSessionDetailPage = lazy(() => import('./pages/CardioSessionDetailPage'))
-const StrengthSessionDetailPage = lazy(() => import('./pages/StrengthSessionDetailPage'))
+const loadCardioSessionDetailPage = () => import('./pages/CardioSessionDetailPage')
+const loadStrengthSessionDetailPage = () => import('./pages/StrengthSessionDetailPage')
+const CardioSessionDetailPage = lazy(loadCardioSessionDetailPage)
+const StrengthSessionDetailPage = lazy(loadStrengthSessionDetailPage)
 const TemplatesPage = lazy(() => import('./pages/TemplatesPage'))
 const StepsPage = lazy(() => import('./pages/StepsPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
@@ -35,6 +37,12 @@ function SessionDetailRouter() {
     queryKey: ['sessions', id, 'type'],
     queryFn: () => api.get<{ type: string }>(`/sessions/${id}`),
   })
+  // Both detail chunks load alongside the type query, not after it. A failed
+  // prefetch is ignored: the lazy page's own import reports it (ChunkErrorBoundary)
+  useEffect(() => {
+    loadStrengthSessionDetailPage().catch(() => {})
+    loadCardioSessionDetailPage().catch(() => {})
+  }, [])
   if (isLoading) return <Layout><p className="text-text-muted-strong text-sm">Loading…</p></Layout>
   if (data?.type === 'strength') return <StrengthSessionDetailPage />
   return <CardioSessionDetailPage />
