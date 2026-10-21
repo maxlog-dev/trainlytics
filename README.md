@@ -101,9 +101,11 @@ The script performs these steps in order:
 
 The API is unavailable between steps 3 and 4 (usually a few seconds; longer if a migration rewrites many rows). If a migration fails, the script stops and leaves the backend down rather than running code against an unmigrated database; fix the cause and run it again.
 
-> **Upgrading to the 2026-10-07 release (session RPE on 1–10):** servers still have the old `deploy.sh`, which starts the new backend before migrating. Run `git pull` first, then `bash scripts/deploy.sh`, so the new script does the deploy. Afterwards, hard-refresh open browser tabs.
+> **Upgrading to the 2026-10-07 release (session RPE on 1–10):** servers still have the old `deploy.sh`, which starts the new backend before migrating. Run `git pull` first, then `bash scripts/deploy.sh`, so the new script does the deploy. Afterwards, hard-refresh open browser tabs (that release predates the service worker).
 
 The script is idempotent — safe to run multiple times.
+
+**How clients pick up a deploy:** the frontend is a PWA whose app shell (HTML, JS, CSS, fonts) is cached by a service worker, so launches don't wait on the network for it; data still needs the network (offline, the app opens on the sign-in page). No hard refresh is needed after a deploy. Each open tab or Home Screen app checks for a new version every hour and whenever it comes back to the foreground (in practice: on the next launch). It downloads the new version in the background and shows a "A new version is available — Reload" banner. The old version keeps running until the user taps Reload, so a workout in progress isn't interrupted; a plain refresh keeps the old version too. A user who dismisses the banner gets the new version once every Trainlytics tab and window is closed. Until then that client runs the old frontend against the new backend, so a release that breaks the API for the previous frontend needs the users to tap Reload (or hard-refresh, which bypasses the service worker). The service worker needs HTTPS (or `localhost`); over plain HTTP the app works as before, without the cache or the banner. Details: [docs/memory/pwa.md](./docs/memory/pwa.md).
 
 ---
 

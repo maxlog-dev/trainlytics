@@ -1,9 +1,45 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      // A new worker waits until the user taps Reload in the update banner
+      // (src/pwaUpdatePrompt.tsx): a silent reload mid-workout would lose form state.
+      registerType: 'prompt',
+      // Registered from React (virtual:pwa-register/react), production builds only
+      injectRegister: false,
+      // public/manifest.webmanifest is the manifest; index.html links it
+      manifest: false,
+      devOptions: { enabled: false },
+      // (A file over the 2 MiB precache limit fails the build, which is the plugin's
+      // default: don't set showMaximumFileSizeToCacheInBytesWarning, it turns that
+      // into a warning and drops the file.)
+      workbox: {
+        // Everything in dist is the offline app shell (sw.js and the Workbox runtime
+        // are excluded automatically), except: public/splash/ (iOS reads its launch
+        // image when the app is added to the Home Screen, not through the page), the
+        // 512px icons (only the OS fetches them, at install), and the font subsets
+        // and formats a modern browser rarely or never loads (latin-ext,
+        // cyrillic-ext, vietnamese, .woff), which stay on the network.
+        globPatterns: ['**/*'],
+        globIgnores: [
+          'splash/**',
+          'icons/*-512.png',
+          'assets/montserrat-{latin-ext,cyrillic-ext,vietnamese}-*',
+          '**/*.woff',
+          '**/*.map',
+        ],
+        navigateFallback: 'index.html',
+        // The API is never served from the worker: no navigate fallback, no runtime caching
+        navigateFallbackDenylist: [/^\/api\//],
+      },
+    }),
+  ],
   server: {
     proxy: {
       '/api': 'http://backend:8000',
