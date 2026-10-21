@@ -155,11 +155,16 @@ export function clearRestLengthError(): void {
   emit()
 }
 
-/** Forgets the device's length and any save in flight (on logout). */
-export function resetRestLength(): void {
+/**
+ * Forgets the device's length and any save in flight (on logout). With
+ * `clearDevice` false only the save is dropped: a tab signed out because
+ * another tab logged out leaves the stored length to that tab (it may already
+ * be the next account's).
+ */
+export function resetRestLength(clearDevice = true): void {
   generation++
   saving = false
   error = null
-  clearStoredRestLength()
+  if (clearDevice) clearStoredRestLength()
   emit()
 }

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, formatErrorDetail } from '../lib/api'
+import { api, formatErrorDetail, getAccessToken } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 
 interface MetricPrefs {
@@ -90,13 +90,19 @@ export function AppleHealthSection({
     }, 3000)
   }
 
-  function uploadFile(file: File) {
+  async function uploadFile(file: File) {
     if (!file.name.toLowerCase().endsWith('.zip')) {
       setUploadState({ phase: 'error', messages: ['File must be a .zip archive.'] })
       return
     }
 
     setUploadState({ phase: 'uploading', progress: 0 })
+    // Right after launch the session may still be renewing (pages render before it settles)
+    const accessToken = token ?? (await getAccessToken())
+    if (!accessToken) {
+      setUploadState({ phase: 'error', messages: ['Could not renew the session. Check your connection and try again.'] })
+      return
+    }
 
     const formData = new FormData()
     formData.append('file', file)
@@ -104,7 +110,7 @@ export function AppleHealthSection({
     const xhr = new XMLHttpRequest()
     const url = includeWorkouts ? '/api/apple-health/upload' : '/api/apple-health/upload?workouts=false'
     xhr.open('POST', url)
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -138,12 +144,12 @@ export function AppleHealthSection({
     e.preventDefault()
     setIsDragOver(false)
     const file = e.dataTransfer.files[0]
-    if (file) uploadFile(file)
+    if (file) void uploadFile(file)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) uploadFile(file)
+    if (file) void uploadFile(file)
     e.target.value = ''
   }
 

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type PlannedSessionOut, type WeekPlanOut } from '../lib/planApi'
 import { EraserIcon } from '../components/EraserIcon'
 import { useFieldArray, useForm, useWatch, Controller } from 'react-hook-form'
 import { Layout } from '../components/Layout'
+import { ChunkErrorBoundary } from '../components/ChunkErrorBoundary'
 import { TimeInput } from '../components/TimeInput'
 import { api } from '../lib/api'
 import { datetimeLocalToUTC, getMondayOfCurrentWeek, localDateTimeNow, toLocalDateStr } from '../lib/dateUtils'
@@ -13,12 +14,18 @@ import { kmToMetres } from '../lib/unitUtils'
 import { StrengthExerciseList } from '../components/StrengthExerciseList'
 import { EmojiRating } from '../components/EmojiRating'
 import { WELLBEING_OPTIONS, RPE_OPTIONS } from '../components/emojiRatingOptions'
-import { AdaptSessionModal } from '../components/AdaptSessionModal'
-import { AdaptCardioModal } from '../components/plan/AdaptCardioModal'
 import { HrInputSection } from '../components/HrInputSection'
 import { DiffModal } from '../components/DiffModal'
 import { useStrengthSessionForm } from '../lib/hooks/useStrengthSessionForm'
 import { describeDraft, strengthViewUrl, type TemplateSummary } from '../lib/strengthSession'
+
+// Loaded on demand: both modals pull in react-markdown, which the core launch path must not ship
+const AdaptSessionModal = lazy(() =>
+  import('../components/AdaptSessionModal').then((m) => ({ default: m.AdaptSessionModal })),
+)
+const AdaptCardioModal = lazy(() =>
+  import('../components/plan/AdaptCardioModal').then((m) => ({ default: m.AdaptCardioModal })),
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared types
@@ -644,11 +651,15 @@ function CardioForm({
     </form>
 
     {showAdaptCardioModal && resolvedPlannedSessionId !== null && (
-      <AdaptCardioModal
-        hasApiKey={hasApiKey}
-        plannedSessionId={resolvedPlannedSessionId}
-        onClose={() => setShowAdaptCardioModal(false)}
-      />
+      <ChunkErrorBoundary fallback={null} onError={() => setShowAdaptCardioModal(false)}>
+      <Suspense fallback={null}>
+        <AdaptCardioModal
+          hasApiKey={hasApiKey}
+          plannedSessionId={resolvedPlannedSessionId}
+          onClose={() => setShowAdaptCardioModal(false)}
+        />
+      </Suspense>
+      </ChunkErrorBoundary>
     )}
     </>
   )
@@ -959,11 +970,15 @@ function StrengthForm() {
 
       {/* Adapt session modal */}
       {showAdaptModal && (
-        <AdaptSessionModal
-          hasApiKey={hasApiKey}
-          sessionSnapshot={buildSessionSnapshot()}
-          onClose={() => setShowAdaptModal(false)}
-        />
+        <ChunkErrorBoundary fallback={null} onError={() => setShowAdaptModal(false)}>
+        <Suspense fallback={null}>
+          <AdaptSessionModal
+            hasApiKey={hasApiKey}
+            sessionSnapshot={buildSessionSnapshot()}
+            onClose={() => setShowAdaptModal(false)}
+          />
+        </Suspense>
+        </ChunkErrorBoundary>
       )}
     </>
   )

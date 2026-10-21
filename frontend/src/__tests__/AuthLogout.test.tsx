@@ -6,8 +6,14 @@ import '@testing-library/jest-dom'
 
 vi.mock('../lib/api', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+  // No session to restore on mount
+  refreshSession: vi.fn(async () => ({ error: 'unauthorized' })),
   setToken: vi.fn(),
   setUnauthorizedHandler: vi.fn(),
+  setSessionRefreshedHandler: vi.fn(),
+  settleRefresh: vi.fn(async () => {}),
+  blockRefresh: vi.fn(),
+  sessionEpoch: () => 0,
 }))
 
 import { api, setUnauthorizedHandler } from '../lib/api'
@@ -23,11 +29,8 @@ function LogoutButton() {
 }
 
 function setup() {
-  // No session to restore on mount; logout itself succeeds
-  vi.mocked(api.post).mockImplementation(async (path: string) => {
-    if (path === '/auth/refresh') throw new Error('Unauthorized')
-    return undefined as never
-  })
+  // Logout itself succeeds
+  vi.mocked(api.post).mockResolvedValue(undefined as never)
   localStorage.setItem('trainlytics_rest_seconds', '180')
   localStorage.setItem('trainlytics_rest_seconds_unsynced', '1')
   const qc = new QueryClient()

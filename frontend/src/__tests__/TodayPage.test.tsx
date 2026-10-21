@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -255,6 +255,34 @@ describe('TodayPage', () => {
     )
     renderToday()
     expect(await screen.findByText("Couldn't load this week.")).toBeInTheDocument()
+  })
+
+  it('keeps the last plan on screen when its refetch fails (e.g. restored from the last visit)', async () => {
+    let fail = false
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/cardio-types') return Promise.resolve([])
+      if (fail) return Promise.reject(new Error('Could not renew the session'))
+      return Promise.resolve({ plan_id: 1, week_start: WEEK, sessions: [session({})] })
+    })
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/today']}>
+          <Routes>
+            <Route path="/today" element={<TodayPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText('Upper body')).toBeInTheDocument()
+
+    fail = true
+    await act(() => qc.refetchQueries({ queryKey: ['plans', WEEK] }))
+
+    expect(qc.getQueryState(['plans', WEEK])?.status).toBe('error')
+    expect(screen.getByText('Upper body')).toBeInTheDocument()
+    expect(screen.getByText(/of 1 sessions done/)).toBeInTheDocument()
+    expect(screen.queryByText(/Couldn't load/)).toBeNull()
   })
 
   it('rolls over to the new day when the app returns to the foreground', async () => {
