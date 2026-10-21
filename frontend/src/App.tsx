@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef } from 'react'
 import {
   BrowserRouter,
   Navigate,
@@ -13,19 +13,21 @@ import { useQuery } from '@tanstack/react-query'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
+import { ChunkErrorBoundary } from './components/ChunkErrorBoundary'
 import LoginPage from './pages/LoginPage'
-import SettingsPage from './pages/SettingsPage'
 import LogWorkoutPage from './pages/LogWorkoutPage'
 import WorkoutModePage from './pages/WorkoutModePage'
-import CardioSessionDetailPage from './pages/CardioSessionDetailPage'
-import StrengthSessionDetailPage from './pages/StrengthSessionDetailPage'
-import TemplatesPage from './pages/TemplatesPage'
-import StepsPage from './pages/StepsPage'
-import ProfilePage from './pages/ProfilePage'
-import StatsPage from './pages/StatsPage'
-import PlanPage from './pages/PlanPage'
 import TodayPage from './pages/TodayPage'
 import { api } from './lib/api'
+
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const CardioSessionDetailPage = lazy(() => import('./pages/CardioSessionDetailPage'))
+const StrengthSessionDetailPage = lazy(() => import('./pages/StrengthSessionDetailPage'))
+const TemplatesPage = lazy(() => import('./pages/TemplatesPage'))
+const StepsPage = lazy(() => import('./pages/StepsPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const StatsPage = lazy(() => import('./pages/StatsPage'))
+const PlanPage = lazy(() => import('./pages/PlanPage'))
 
 function SessionDetailRouter() {
   const { id } = useParams<{ id: string }>()
@@ -62,6 +64,8 @@ function AppRoutes() {
   return (
     <AuthProvider onAuthRequired={handleAuthRequired}>
       <ScrollToTop />
+      <ChunkErrorBoundary>
+      <Suspense fallback={<Layout><p className="text-text-muted-strong text-sm">Loading…</p></Layout>}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
@@ -162,6 +166,8 @@ function AppRoutes() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
+      </ChunkErrorBoundary>
     </AuthProvider>
   )
 }
